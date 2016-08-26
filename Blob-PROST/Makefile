@@ -5,7 +5,7 @@
 ALE := ../../Arcade-Learning-Environment
 
 # Set this to 1 to enable SDL and display_screen
-USE_SDL     := 0
+USE_SDL := 1
 
 # -O3 Optimize code (urns on all optimizations specified by -O2 and also turns on the -finline-functions, -funswitch-loops, -fpredictive-commoning, -fgcse-after-reload, -ftree-loop-vectorize, -ftree-slp-vectorize, -fvect-cost-model, -ftree-partial-pre and -fipa-cp-clone options).
 # -D__USE_SDL Ensures we can use SDL to see the game screen
@@ -23,6 +23,10 @@ ifeq ($(strip $(USE_SDL)), 1)
 endif
 
 all: learnerBlobTime
+
+cmp_link:
+	$(CXX) $(FLAGS) -c $(ARG1) -o bin/$(ARG2)
+	$(CXX) $(FLAGS) bin/mainBlobTime.o bin/Mathematics.o bin/Timer.o bin/Parameters.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o -o learnerBlobTime
 
 learnerBlobTime: bin/mainBlobTime.o bin/Mathematics.o bin/Parameters.o bin/Timer.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o
 	$(CXX) $(FLAGS) bin/mainBlobTime.o bin/Mathematics.o bin/Timer.o bin/Parameters.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o -o learnerBlobTime
@@ -44,20 +48,20 @@ bin/Features.o: features/Features.cpp
 
 bin/Background.o: features/Background.cpp
 	$(CXX) $(FLAGS) -c features/Background.cpp -o bin/Background.o
-	
+
 bin/BlobTimeFeatures.o: features/BlobTimeFeatures.cpp
-	$(CXX) $(FLAGS) -c features/BlobTimeFeatures.cpp -o bin/BlobTimeFeatures.o	
-	
+	$(CXX) $(FLAGS) -c features/BlobTimeFeatures.cpp -o bin/BlobTimeFeatures.o
+
 bin/RLLearner.o: agents/rl/RLLearner.cpp
 	$(CXX) $(FLAGS) -c agents/rl/RLLearner.cpp -o bin/RLLearner.o
 
 bin/SarsaLearner.o: agents/rl/sarsa/SarsaLearner.cpp
 	$(CXX) $(FLAGS) -c agents/rl/sarsa/SarsaLearner.cpp -o bin/SarsaLearner.o
-		
+
 clean:
 	rm -rf ${OUT_FILE} bin/*.o
 	rm -f learner*
-	rm -f *.txt	
+	rm -f *.txt
 
 
 #This command needs to be executed in a osX before running the code:
