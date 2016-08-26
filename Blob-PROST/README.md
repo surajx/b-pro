@@ -4,11 +4,13 @@
 * Fork B_PRO from https://github.com/mcmachado/b-pro
 
 #### Configuring ALE
+
 * makefile.unix
     * SET: USE_SDL=1
     * CMD: make all -f makefile.unix -j8
 
 #### Configuring B-PRO
+
 * b-pro/Blob-PROST/mainBlobTime.cpp
     * CHANGE
         -ale.setFloat("frame_skip", param.getNumStepsPerAction());
@@ -23,3 +25,7 @@
 * Makefile
     * SET: USE_SDL := 1
     *CMD: make all
+
+#### Run the game
+
+* ./learnerBlobTime -s 3434 -c ../conf/bpro.cfg -r /home/surajx/git/gym/env/lib/python2.7/site-packages/atari_py/atari_roms/montezuma_revenge.bin
