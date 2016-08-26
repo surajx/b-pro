@@ -11,8 +11,8 @@
 #### Configuring B-PRO
 * b-pro/Blob-PROST/mainBlobTime.cpp
     * CHANGE
-        -ale.setFloat("frame_skip", param.getNumStepsPerAction());
-        +ale.setInt("frame_skip", param.getNumStepsPerAction());
+        * -ale.setFloat("frame_skip", param.getNumStepsPerAction());
+        * +ale.setInt("frame_skip", param.getNumStepsPerAction());
 
 * b-pro/conf/bpro.cfg
     * SET: DISPLAY = 1
