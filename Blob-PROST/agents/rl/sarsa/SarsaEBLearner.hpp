@@ -18,16 +18,16 @@
 using namespace std;
 
 class SarsaEBLearner : public SarsaLearner {
-private:
-    double beta, sigma;
+ private:
+  double beta, sigma;
 
-    /**
+  /**
    * Constructor declared as private to force the user to instantiate
    * SarsaEBLearner informing the parameters to learning/execution.
    */
-    SarsaEBLearner();
+  SarsaEBLearner();
 
-    /**
+  /**
   * The distance between current state-action pair and a centroid in feature
   * space.
   * @param vector<long long>& sa_cur a concatenation of the feature vector
@@ -37,9 +37,9 @@ private:
   *        the centroids may simply be positions of the visited state-action
   *        pairs in feature space.
   */
-    void metric(vector<long long>& sa_cur, vector<long long>& centroid);
+  void metric(vector<long long>& sa_cur, vector<long long>& centroid);
 
-    /**
+  /**
   * Measure of similarity between state-action pairs and a centroid.
   * Computed using a gaussian kernel centered on the centroid. The Measure
   * takes values between 0 and 1.
@@ -50,37 +50,39 @@ private:
   *        the centroids may simply be positions of the visited state-action
   *        pairs in feature space.
   */
-    void similarity_measure(vector<long long>& sa_cur,
-        vector<long long>& centroid);
+  void similarity_measure(vector<long long>& sa_cur,
+                          vector<long long>& centroid);
 
-    /**
+  /**
   * A generalized state-action visit count. Roughly represents the visit
   * density at a point in feature space.
   * @param vector<long long>& sa_cur A concatenation of the feature vector
   *        and action.
   */
-    double pseudo_count(vector<long long>& sa_cur);
+  double pseudo_count(vector<long long>& sa_cur);
 
-    /**
+  /**
   * A bonus added to the external reward to incentivise exploration. Roughly
   * a local information reward for visiting a state-action pair.
   * @param vector<long long>& features The feature used in the linear approx.
   * of the Q-function.
   * @param int action The action for which the bonus is calculated.
   */
-    double exploration_bonus(vector<long long>& features, int action);
+  double exploration_bonus(vector<long long>& features, int action);
 
-public:
-    /**
+ public:
+  /**
   *   Initialize everything required for SarsaLearner.
   *   Additional params for EB:
   *   @param beta  Exploration rate.
   *   @param sigma Generalization factor.
   */
-    SarsaEBLearner(ALEInterface& ale, Features* features, Parameters* param,
-        int seed);
+  SarsaEBLearner(ALEInterface& ale,
+                 Features* features,
+                 Parameters* param,
+                 int seed);
 
-    void learnPolicy(ALEInterface& ale, Features* features);
+  void learnPolicy(ALEInterface& ale, Features* features);
 
-    ~SarsaEBLearner();
+  ~SarsaEBLearner();
 };
