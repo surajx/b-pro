@@ -26,10 +26,10 @@ all: learnerBlobTime
 
 cmp_link:
 	$(CXX) $(FLAGS) -c $(ARG1) -o bin/$(ARG2)
-	$(CXX) $(FLAGS) bin/mainBlobTime.o bin/Mathematics.o bin/Timer.o bin/Parameters.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o -o learnerBlobTime
+	$(CXX) $(FLAGS) bin/mainBlobTime.o bin/Mathematics.o bin/Timer.o bin/Parameters.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o bin/SarsaEBLearner.o -o learnerBlobTime
 
-learnerBlobTime: bin/mainBlobTime.o bin/Mathematics.o bin/Parameters.o bin/Timer.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o
-	$(CXX) $(FLAGS) bin/mainBlobTime.o bin/Mathematics.o bin/Timer.o bin/Parameters.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o -o learnerBlobTime
+learnerBlobTime: bin/mainBlobTime.o bin/Mathematics.o bin/Parameters.o bin/Timer.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o bin/SarsaEBLearner.o
+	$(CXX) $(FLAGS) bin/mainBlobTime.o bin/Mathematics.o bin/Timer.o bin/Parameters.o bin/Features.o bin/Background.o bin/BlobTimeFeatures.o bin/RLLearner.o bin/SarsaLearner.o bin/SarsaEBLearner.o -o learnerBlobTime
 
 bin/mainBlobTime.o: mainBlobTime.cpp
 	$(CXX) $(FLAGS) -c mainBlobTime.cpp -o bin/mainBlobTime.o
@@ -57,6 +57,9 @@ bin/RLLearner.o: agents/rl/RLLearner.cpp
 
 bin/SarsaLearner.o: agents/rl/sarsa/SarsaLearner.cpp
 	$(CXX) $(FLAGS) -c agents/rl/sarsa/SarsaLearner.cpp -o bin/SarsaLearner.o
+
+bin/SarsaEBLearner.o: agents/rl/sarsa/SarsaEBLearner.cpp
+	$(CXX) $(FLAGS) -c agents/rl/sarsa/SarsaEBLearner.cpp -o bin/SarsaEBLearner.o
 
 clean:
 	rm -rf ${OUT_FILE} bin/*.o

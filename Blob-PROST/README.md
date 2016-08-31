@@ -19,12 +19,14 @@
 * b-pro/conf/bpro.cfg
     * SET: DISPLAY = 1
 
+* Copy ale.cfg from ALE repo to b-pro/Blob-PROST
+
 * SYSTEM
-    *SET: LD_LIBRARY_PATH="$LD_LIBRARY_PATH:<path to ale>"
+    * SET: LD_LIBRARY_PATH="$LD_LIBRARY_PATH:<path to ale>"
 
 * Makefile
     * SET: USE_SDL := 1
-    *CMD: make all
+    * CMD: make all
 
 #### Run the game
 

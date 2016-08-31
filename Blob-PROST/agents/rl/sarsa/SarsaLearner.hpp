@@ -25,7 +25,7 @@ struct Group{
 };
 
 class SarsaLearner : public RLLearner{
-private:
+protected:
     float alpha, delta, lambda, traceThreshold;
     float learningRate;
     int currentAction, nextAction;

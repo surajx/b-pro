@@ -19,7 +19,7 @@
 #endif
 #ifndef SARSA_H
 #define SARSA_H
-#include "agents/rl/sarsa/SarsaLearner.hpp"
+#include "agents/rl/sarsa/SarsaEBLearner.hpp"
 #endif
 #ifndef BASIC_H
 #define BASIC_H
@@ -64,7 +64,7 @@ int main(int argc, char** argv){
 
     //mt19937 agentRand(param.getSeed());
 	//Instantiating the learning algorithm:
-	SarsaLearner sarsaLearner(ale, &features, &param, 2*param.getSeed()-1);
+	SarsaEBLearner sarsaLearner(ale, &features, &param, 2*param.getSeed()-1);
     //Learn a policy:
     sarsaLearner.learnPolicy(ale, &features);
 
