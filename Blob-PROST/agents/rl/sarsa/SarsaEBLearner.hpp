@@ -20,6 +20,8 @@ using namespace std;
 class SarsaEBLearner : public SarsaLearner{
 private:
 
+    double beta,sigma;
+
     /**
      * Constructor declared as private to force the user to instantiate SarsaLearner
      * informing the parameters to learning/execution.

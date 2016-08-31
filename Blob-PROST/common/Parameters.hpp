@@ -32,6 +32,8 @@ private:
     double gamma;                   //discount factor
     double epsilon;                 //exploration probability
     double lambda;                  //trace
+    double beta;                    //Exploration bonus
+    double sigma;                   //Generalization Parameter
     double traceThreshold;          //threshold to make the trace zero, to avoid very small values
     int seed;                       //seed to be used by the random number generator
     int display;                    //if it should display screen
@@ -151,6 +153,14 @@ private:
      * @param double value that represents LAMBDA in the config file
      */
     void setLambda(double a);
+    /**
+     * @param double value that represents BETA in the config file
+     */
+    void setBeta(double a);
+    /**
+     * @param double value that represents SIGMA in the config file
+     */
+    void setSigma(double a);    
     /**
      * @param int (representing double) value that represents DISPLAY in the config file.
      * If 1 the game will be shown, otherwise it is just run without graphical output.
@@ -294,6 +304,14 @@ public:
      * @return double value read for LAMBDA parameter
      */
     double getLambda();
+    /**
+     * @return double value read for BETA parameter
+     */
+    double getBeta();
+    /**
+     * @return double value read for SIGMA parameter
+     */
+    double getSigma();    
     /**
      * @return int (representing bool) value read for DISPLAY parameter
      * If 1 the game will be shown, otherwise it is just run without graphical output.

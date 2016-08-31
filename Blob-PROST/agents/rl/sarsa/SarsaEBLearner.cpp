@@ -22,6 +22,8 @@ using namespace std;
 
 SarsaEBLearner::SarsaEBLearner(ALEInterface& ale, Features *features, Parameters *param,int seed) : SarsaLearner(ale, features, param,seed) {
     printf("SarsaEBLearner is Running the show!!!\n");
+    beta  = param->getBeta();
+    sigma = param->getSigma();
 }
 
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features *features){
