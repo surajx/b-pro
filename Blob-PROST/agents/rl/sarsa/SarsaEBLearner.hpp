@@ -20,6 +20,7 @@ using namespace std;
 class SarsaEBLearner : public SarsaLearner {
  private:
   double beta, sigma;
+  unordered_map<long long, double> featureProbs;
 
   /**
    * Constructor declared as private to force the user to instantiate
@@ -69,6 +70,13 @@ class SarsaEBLearner : public SarsaLearner {
   * @param int action The action for which the bonus is calculated.
   */
   double exploration_bonus(vector<long long>& features, int action);
+
+  /**
+  *
+  * Update the running probablity measure for occurance for each feature.
+  * Update Formula: mu_{t+1} = mu_t + (phi_{t+1} - mu_t)/(1+t)
+  */
+  void update_prob_feature(vector<long long>& features, long time_step);
 
  public:
   /**

@@ -28,6 +28,24 @@ SarsaEBLearner::SarsaEBLearner(ALEInterface& ale,
   printf("SarsaEBLearner is Running the show!!!\n");
   beta = param->getBeta();
   sigma = param->getSigma();
+
+  featureProbs.clear();
+  featureProbs.reserve(50000);
+}
+
+void SarsaEBLearner::update_prob_feature(vector<long long>& features,
+                                         long time_step) {
+  // Update Formula: mu_{t+1} = mu_t + (phi_{t+1} - mu_t)/(1+t)
+
+  // Update p1: mu_{t+1}^' = mu_t * (1 -(1/(1+t)))
+  for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
+    featureProbs[it->first] = it->second * (1 - (1.0 / (1 + time_step)));
+  }
+
+  // Update p2: mu_{t+1} = mu_{t+1}^' + (1/(1+t))
+  for (long long featIdx : features) {
+    featureProbs[featIdx] = featureProbs[featIdx] + (1.0 / (1 + time_step));
+  }
 }
 
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
@@ -40,6 +58,8 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
   vector<float> episodeResults;
   vector<int> episodeFrames;
   vector<double> episodeFps;
+
+  long time_step = 1;
 
   long long trueFeatureSize = 0;
   long long trueFnextSize = 0;
@@ -94,6 +114,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         Fnext.clear();
         features->getActiveFeaturesIndices(ale.getScreen(), ale.getRAM(),
                                            Fnext);
+        update_prob_feature(Fnext, time_step);
         trueFnextSize = Fnext.size();
         groupFeatures(Fnext);
 
@@ -124,6 +145,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       F = Fnext;
       trueFeatureSize = trueFnextSize;
       currentAction = nextAction;
+      time_step++;
     }
     gettimeofday(&tvEnd, NULL);
     timeval_subtract(&tvDiff, &tvEnd, &tvBegin);
