@@ -96,8 +96,9 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
                                            Fnext);
         trueFnextSize = Fnext.size();
         groupFeatures(Fnext);
-        updateQValues(Fnext,
-                      Qnext);  // Update Q-values for the new active features
+
+        // Update Q-values for the new active features
+        updateQValues(Fnext, Qnext);
         nextAction = epsilonGreedy(Qnext, episode);
       } else {
         nextAction = 0;
