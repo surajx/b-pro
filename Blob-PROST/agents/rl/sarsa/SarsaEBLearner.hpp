@@ -20,7 +20,7 @@ using namespace std;
 class SarsaEBLearner : public SarsaLearner {
  private:
   double beta, sigma;
-  unordered_map<long long, double> featureProbs;
+  unordered_map<long long, vector<double>> featureProbs;
 
   /**
    * Constructor declared as private to force the user to instantiate
@@ -77,6 +77,13 @@ class SarsaEBLearner : public SarsaLearner {
   * Update Formula: mu_{t+1} = mu_t + (phi_{t+1} - mu_t)/(1+t)
   */
   void update_prob_feature(vector<long long>& features, long time_step);
+
+  /**
+  *
+  *
+  *
+  */
+  double pseudo_count_from_joint(vector<long long>& features, long time_step);
 
  public:
   /**

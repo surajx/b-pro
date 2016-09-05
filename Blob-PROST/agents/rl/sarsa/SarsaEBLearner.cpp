@@ -12,11 +12,14 @@
 #ifndef TIMER_H
 #define TIMER_H
 #include "../../../common/Timer.hpp"
+#include "../../../common/Mathematics.hpp"
 #endif
 #include "SarsaEBLearner.hpp"
 #include <stdio.h>
 #include <math.h>
 #include <set>
+
+#include <algorithm>
 
 using namespace std;
 
@@ -39,13 +42,39 @@ void SarsaEBLearner::update_prob_feature(vector<long long>& features,
 
   // Update p1: mu_{t+1}^' = mu_t * (1 -(1/(1+t)))
   for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
-    featureProbs[it->first] = it->second * (1 - (1.0 / (1 + time_step)));
+    featureProbs[it->first][0] = it->second[0] * (1 - (1.0 / (1 + time_step)));
+    it->second[1] = 0;
   }
 
   // Update p2: mu_{t+1} = mu_{t+1}^' + (1/(1+t))
   for (long long featIdx : features) {
-    featureProbs[featIdx] = featureProbs[featIdx] + (1.0 / (1 + time_step));
+    if (featureProbs.find(featIdx) == featureProbs.end()) {
+      featureProbs.insert(std::make_pair(featIdx, std::vector<double>(2)));
+    }
+
+    featureProbs[featIdx][0] =
+        featureProbs[featIdx][0] + (1.0 / (1 + time_step));
   }
+}
+
+double SarsaEBLearner::pseudo_count_from_joint(vector<long long>& features,
+                                               long time_step) {
+  long double joint = 1;
+  for (long long featIdx : features) {
+    joint *= featureProbs[featIdx][0];
+    featureProbs[featIdx][1] = 1;
+  }
+
+  for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
+    if (it->second[1] == 0) {
+      joint *= 1 - featureProbs[it->first][0];
+    } else {
+      it->second[1] = 0;
+    }
+  }
+  printf("joint: %f\n", joint);
+  printf("pseudo_count: %f\n", joint * time_step);
+  return joint * time_step;
 }
 
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
@@ -95,6 +124,9 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
 
     currentAction = epsilonGreedy(Q, episode);
     gettimeofday(&tvBegin, NULL);
+    double next_exp_bonus = 0;
+    double cur_exp_bonus = 0;
+    vector<float> tmp_Q;
     int lives = ale.lives();
     // Repeat(for each step of episode) until game is over:
     // This also stops when the maximum number of steps per episode is reached
@@ -115,12 +147,18 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         features->getActiveFeaturesIndices(ale.getScreen(), ale.getRAM(),
                                            Fnext);
         update_prob_feature(Fnext, time_step);
+        next_exp_bonus =
+            beta / sqrt(pseudo_count_from_joint(Fnext, time_step) + 0.01);
         trueFnextSize = Fnext.size();
         groupFeatures(Fnext);
 
         // Update Q-values for the new active features
         updateQValues(Fnext, Qnext);
-        nextAction = epsilonGreedy(Qnext, episode);
+        // nextAction = epsilonGreedy(Qnext, episode);
+        tmp_Q = Qnext;
+        std::transform(tmp_Q.begin(), tmp_Q.end(), tmp_Q.begin(),
+                       bind2nd(std::plus<double>(), next_exp_bonus));
+        nextAction = Mathematics::argmax(tmp_Q, agentRand);
       } else {
         nextAction = 0;
         for (unsigned int i = 0; i < Qnext.size(); i++) {
@@ -133,7 +171,8 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         maxFeatVectorNorm = trueFeatureSize;
         learningRate = alpha / maxFeatVectorNorm;
       }
-      delta = reward[0] + gamma * Qnext[nextAction] - Q[currentAction];
+      delta = reward[0] + cur_exp_bonus + gamma * Qnext[nextAction] -
+              Q[currentAction];
 
       // Update weights vector:
       for (unsigned int a = 0; a < nonZeroElig.size(); a++) {
@@ -145,8 +184,15 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       F = Fnext;
       trueFeatureSize = trueFnextSize;
       currentAction = nextAction;
+      cur_exp_bonus = next_exp_bonus;
       time_step++;
     }
+
+    // for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
+    //   std::cout << "Prob for feature: " << it->first << ":" << it->second[0]
+    //             << "," << it->second[1] << endl;
+    // }
+
     gettimeofday(&tvEnd, NULL);
     timeval_subtract(&tvDiff, &tvEnd, &tvBegin);
     elapsedTime = double(tvDiff.tv_sec) + double(tvDiff.tv_usec) / 1000000.0;
