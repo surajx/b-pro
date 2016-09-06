@@ -83,7 +83,7 @@ class SarsaEBLearner : public SarsaLearner {
   *
   *
   */
-  double pseudo_count_from_joint(vector<long long>& features, long time_step);
+  double exp_bonus_from_joint(vector<long long>& features, long time_step);
 
  public:
   /**

@@ -57,24 +57,28 @@ void SarsaEBLearner::update_prob_feature(vector<long long>& features,
   }
 }
 
-double SarsaEBLearner::pseudo_count_from_joint(vector<long long>& features,
-                                               long time_step) {
-  long double joint = 1;
+double SarsaEBLearner::exp_bonus_from_joint(vector<long long>& features,
+                                            long time_step) {
+  double log_joint = 0;
   for (long long featIdx : features) {
-    joint *= featureProbs[featIdx][0];
+    log_joint += -log(featureProbs[featIdx][0]);
     featureProbs[featIdx][1] = 1;
   }
 
   for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
     if (it->second[1] == 0) {
-      joint *= 1 - featureProbs[it->first][0];
+      log_joint += -log(1 - featureProbs[it->first][0]);
     } else {
       it->second[1] = 0;
     }
   }
-  printf("joint: %f\n", joint);
-  printf("pseudo_count: %f\n", joint * time_step);
-  return joint * time_step;
+  double pseudo_count = exp(-(log_joint - log(time_step)));
+  printf("log_joint: %f\n", log_joint);
+  printf("pseudo_count: %.100f\n", pseudo_count);
+  if (pseudo_count == 0) {
+    return 0;
+  }
+  return beta / sqrt(pseudo_count + 0.01);
 }
 
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
@@ -147,18 +151,22 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         features->getActiveFeaturesIndices(ale.getScreen(), ale.getRAM(),
                                            Fnext);
         update_prob_feature(Fnext, time_step);
-        next_exp_bonus =
-            beta / sqrt(pseudo_count_from_joint(Fnext, time_step) + 0.01);
+
+        next_exp_bonus = exp_bonus_from_joint(Fnext, time_step);
         trueFnextSize = Fnext.size();
         groupFeatures(Fnext);
 
         // Update Q-values for the new active features
         updateQValues(Fnext, Qnext);
-        // nextAction = epsilonGreedy(Qnext, episode);
-        tmp_Q = Qnext;
-        std::transform(tmp_Q.begin(), tmp_Q.end(), tmp_Q.begin(),
-                       bind2nd(std::plus<double>(), next_exp_bonus));
-        nextAction = Mathematics::argmax(tmp_Q, agentRand);
+        if (next_exp_bonus == 0) {
+          printf("epsilon greedy!");
+          nextAction = epsilonGreedy(Qnext, episode);
+        } else {
+          tmp_Q = Qnext;
+          std::transform(tmp_Q.begin(), tmp_Q.end(), tmp_Q.begin(),
+                         bind2nd(std::plus<double>(), next_exp_bonus));
+          nextAction = Mathematics::argmax(tmp_Q, agentRand);
+        }
       } else {
         nextAction = 0;
         for (unsigned int i = 0; i < Qnext.size(); i++) {
