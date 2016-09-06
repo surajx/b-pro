@@ -33,51 +33,56 @@ SarsaEBLearner::SarsaEBLearner(ALEInterface& ale,
   sigma = param->getSigma();
 
   featureProbs.clear();
-  featureProbs.reserve(50000);
+  featureProbs.reserve(60000);
 }
 
 void SarsaEBLearner::update_prob_feature(vector<long long>& features,
                                          long time_step) {
-  // Update Formula: mu_{t+1} = mu_t + (phi_{t+1} - mu_t)/(1+t)
+  // Update Formula: rho_{t+1} = ((rho_t * (t + 1)) + phi_{t + 1}) / (t + 2)
 
-  // Update p1: mu_{t+1}^' = mu_t * (1 -(1/(1+t)))
+  // Update p1: rho_{t+1}^' = rho_t * (t + 1) / (t + 2)
   for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
-    featureProbs[it->first][0] = it->second[0] * (1 - (1.0 / (1 + time_step)));
+    featureProbs[it->first][0] =
+        it->second[0] * ((time_step + 1.0) / (time_step + 2));
     it->second[1] = 0;
   }
 
-  // Update p2: mu_{t+1} = mu_{t+1}^' + (1/(1+t))
+  // Update p2: rho_{t + 1} = rho_{t + 1}^'  + (phi_{t + 1} / (t + 2))
   for (long long featIdx : features) {
-    if (featureProbs.find(featIdx) == featureProbs.end()) {
-      featureProbs.insert(std::make_pair(featIdx, std::vector<double>(2)));
-    }
-
     featureProbs[featIdx][0] =
-        featureProbs[featIdx][0] + (1.0 / (1 + time_step));
+        featureProbs[featIdx][0] + (1.0 / (time_step + 2));
   }
 }
 
-double SarsaEBLearner::exp_bonus_from_joint(vector<long long>& features,
-                                            long time_step) {
+double SarsaEBLearner::feature_log_joint_prob(vector<long long>& features,
+                                              long time_step) {
   double log_joint = 0;
   for (long long featIdx : features) {
-    log_joint += -log(featureProbs[featIdx][0]);
+    if (featureProbs.find(featIdx) == featureProbs.end()) {
+      vector<double> v = {0.5 / (time_step + 1), 0};
+      featureProbs.insert(std::make_pair(featIdx, v));
+    }
+    log_joint += log(featureProbs[featIdx][0]);
     featureProbs[featIdx][1] = 1;
   }
 
   for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
     if (it->second[1] == 0) {
-      log_joint += -log(1 - featureProbs[it->first][0]);
+      log_joint += log(1 - it->second[0]);
     } else {
       it->second[1] = 0;
     }
   }
-  double pseudo_count = exp(-(log_joint - log(time_step)));
-  printf("log_joint: %f\n", log_joint);
-  printf("pseudo_count: %.100f\n", pseudo_count);
-  if (pseudo_count == 0) {
-    return 0;
-  }
+
+  return log_joint;
+}
+
+double SarsaEBLearner::exploration_bonus(vector<long long>& features,
+                                         long time_step) {
+  double sum_log_rho = feature_log_joint_prob(features, time_step);
+  update_prob_feature(features, time_step);
+  double sum_log_rho_prime = feature_log_joint_prob(features, time_step);
+  double pseudo_count = 1 / (exp(sum_log_rho_prime - sum_log_rho) - 1);
   return beta / sqrt(pseudo_count + 0.01);
 }
 
@@ -128,7 +133,6 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
 
     currentAction = epsilonGreedy(Q, episode);
     gettimeofday(&tvBegin, NULL);
-    double next_exp_bonus = 0;
     double cur_exp_bonus = 0;
     vector<float> tmp_Q;
     int lives = ale.lives();
@@ -150,23 +154,18 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         Fnext.clear();
         features->getActiveFeaturesIndices(ale.getScreen(), ale.getRAM(),
                                            Fnext);
-        update_prob_feature(Fnext, time_step);
-
-        next_exp_bonus = exp_bonus_from_joint(Fnext, time_step);
+        cur_exp_bonus = exploration_bonus(Fnext, time_step);
         trueFnextSize = Fnext.size();
         groupFeatures(Fnext);
 
         // Update Q-values for the new active features
         updateQValues(Fnext, Qnext);
-        if (next_exp_bonus == 0) {
-          printf("epsilon greedy!");
-          nextAction = epsilonGreedy(Qnext, episode);
-        } else {
-          tmp_Q = Qnext;
-          std::transform(tmp_Q.begin(), tmp_Q.end(), tmp_Q.begin(),
-                         bind2nd(std::plus<double>(), next_exp_bonus));
-          nextAction = Mathematics::argmax(tmp_Q, agentRand);
-        }
+        // nextAction = epsilonGreedy(Qnext, episode);
+        tmp_Q = Qnext;
+        std::transform(tmp_Q.begin(), tmp_Q.end(), tmp_Q.begin(),
+                       bind2nd(std::plus<double>(), cur_exp_bonus));
+        nextAction = Mathematics::argmax(tmp_Q, agentRand);
+        printf("nextAction: %d\n", nextAction);
       } else {
         nextAction = 0;
         for (unsigned int i = 0; i < Qnext.size(); i++) {
@@ -181,7 +180,6 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       }
       delta = reward[0] + cur_exp_bonus + gamma * Qnext[nextAction] -
               Q[currentAction];
-
       // Update weights vector:
       for (unsigned int a = 0; a < nonZeroElig.size(); a++) {
         for (unsigned int i = 0; i < nonZeroElig[a].size(); i++) {
@@ -192,7 +190,6 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       F = Fnext;
       trueFeatureSize = trueFnextSize;
       currentAction = nextAction;
-      cur_exp_bonus = next_exp_bonus;
       time_step++;
     }
 

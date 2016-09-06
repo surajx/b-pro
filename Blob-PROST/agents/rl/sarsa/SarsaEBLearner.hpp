@@ -67,14 +67,16 @@ class SarsaEBLearner : public SarsaLearner {
   * a local information reward for visiting a state-action pair.
   * @param vector<long long>& features The feature used in the linear approx.
   * of the Q-function.
-  * @param int action The action for which the bonus is calculated.
+  * @param long int: time steps elapsed
   */
-  double exploration_bonus(vector<long long>& features, int action);
+  double exploration_bonus(vector<long long>& features, long time_step);
 
   /**
-  *
   * Update the running probablity measure for occurance for each feature.
   * Update Formula: mu_{t+1} = mu_t + (phi_{t+1} - mu_t)/(1+t)
+  * @param vector<long long>& features The feature used in the linear approx.
+  * of the Q-function.
+  * @param int no of time steps elapsed.
   */
   void update_prob_feature(vector<long long>& features, long time_step);
 
@@ -83,7 +85,7 @@ class SarsaEBLearner : public SarsaLearner {
   *
   *
   */
-  double exp_bonus_from_joint(vector<long long>& features, long time_step);
+  double feature_log_joint_prob(vector<long long>& features, long time_step);
 
  public:
   /**
