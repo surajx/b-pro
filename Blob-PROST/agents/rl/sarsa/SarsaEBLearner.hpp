@@ -21,6 +21,10 @@ class SarsaEBLearner : public SarsaLearner {
  private:
   double beta, sigma;
   unordered_map<long long, vector<double>> featureProbs;
+  unordered_map<long long, double> actionProbs;
+
+  const int ACTION_OFFSET = 2;
+  int NUM_PHI_OFFSET;
 
   /**
    * Constructor declared as private to force the user to instantiate
@@ -81,11 +85,11 @@ class SarsaEBLearner : public SarsaLearner {
   void update_prob_feature(vector<long long>& features, long time_step);
 
   /**
-  *
-  *
-  *
+  * Calculate: log(p(phi, a)) = \sum_{i=1}^{len(phi)} log(p(phi_i)p(a/phi_i))
   */
-  double feature_log_joint_prob(vector<long long>& features, long time_step);
+  double feature_log_joint_prob(vector<long long>& features,
+                                long time_step,
+                                bool isFirst);
 
  public:
   /**

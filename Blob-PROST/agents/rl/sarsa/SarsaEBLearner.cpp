@@ -32,44 +32,99 @@ SarsaEBLearner::SarsaEBLearner(ALEInterface& ale,
   beta = param->getBeta();
   sigma = param->getSigma();
 
+  actionProbs.clear();
   featureProbs.clear();
   featureProbs.reserve(60000);
+
+  NUM_PHI_OFFSET = ACTION_OFFSET + numActions;
 }
 
-void SarsaEBLearner::update_prob_feature(vector<long long>& features,
-                                         long time_step) {
-  // Update Formula: rho_{t+1} = ((rho_t * (t + 1)) + phi_{t + 1}) / (t + 2)
+void SarsaEBLearner::update_action_marginals() {}
 
-  // Update p1: rho_{t+1}^' = rho_t * (t + 1) / (t + 2)
+void SarsaEBLearner::update_probs(vector<long long>& features,
+                                  int action,
+                                  long time_step) {
+  // Updating the p(phi) and p(a/phi)
+  // p(phi)  : rho_{t+1} = ((rho_t * (t + 1)) + phi_{t + 1}) / (t + 2)
+  // p(a/phi): p_{t + 1}(a / phi) =
+  //    p_t * (n_{phi} + 1) / (n_{phi} + 2) + I[a = cur_act] / (n_{phi} + 2)
+
   for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
-    featureProbs[it->first][0] =
-        it->second[0] * ((time_step + 1.0) / (time_step + 2));
+    // Update p1: rho_{t+1}^' = rho_t * (t + 1) / (t + 2)
+    it->second[0] *= ((time_step + 1.0) / (time_step + 2));
     it->second[1] = 0;
   }
 
   // Update p2: rho_{t + 1} = rho_{t + 1}^'  + (phi_{t + 1} / (t + 2))
   for (long long featIdx : features) {
-    featureProbs[featIdx][0] =
-        featureProbs[featIdx][0] + (1.0 / (time_step + 2));
+    featureProbs[featIdx][0] += (1.0 / (time_step + 2));
+
+    double n_phi = featureProbs[featIdx][NUM_PHI_OFFSET];
+    for (int a = 0; a < numActions; a++) {
+      featureProbs[featIdx][a + ACTION_OFFSET] *= (n_phi + 1.0) / (n_phi + 2);
+      if (a == action) {
+        featureProbs[featIdx][a + ACTION_OFFSET] += (1.0 / n_phi + 2);
+      }
+    }
   }
 }
 
 double SarsaEBLearner::feature_log_joint_prob(vector<long long>& features,
-                                              long time_step) {
+                                              long time_step,
+                                              int action,
+                                              bool isFirst) {
   double log_joint = 0;
+
+  // Iterating over the features to calculate the joint
+  // - If the feature has not been seen before we create a new map entry of the
+  //   form [feature index] : vector {
+  //              p(phi_{i}),
+  //              seen_flag, # 1-seen, 0-not
+  //              p(a_1/phi_{i}),...,p(a_n/phi_{i}),
+  //              n_phi # No of time phi has been active
+  //   }
+  //
+
+  // TODO: Don't store the last p(a/phi_i),
+  //       calculate it as 1 - \sum_{j=1}^{numActions-1} p(a_j/phi_i)
+
+  // Offset in featureProbs value vector to get phi conditional action probs.
+
   for (long long featIdx : features) {
     if (featureProbs.find(featIdx) == featureProbs.end()) {
-      vector<double> v = {0.5 / (time_step + 1), 0};
+      // Creating new vector to store needed data for active feature.
+      vector<double> v(ACTION_OFFSET + numActions + 1);
+      v.push_back(0.5 / (time_step + 1);
+      v.push_back(0);
+
+      // p(a=cur_act/phi_i=1) = \frac{n_{cur_act} + (1/numActions)}{n_phi + 1}
+      // Here, n_{a} = 0
+      for (int action = 0; action < numActions; action++) {
+        v.push_back(1.0 / (numActions * 2));
+      }
+      v.push_back(0);
       featureProbs.insert(std::make_pair(featIdx, v));
     }
-    log_joint += log(featureProbs[featIdx][0]);
+
+    // p(a=cur_act, phi_i=1) = p(phi_i=1)*p(a=cur_act/phi_i=1)
+    log_joint += log(featureProbs[featIdx][0]) +
+                 log(featureProbs[featIdx][action + ACTION_OFFSET]);
+    if (isFirst) {
+      // Increment n_{phi} as the feature is active.
+      featureProbs[featIdx][NUM_PHI_OFFSET] += 1;
+    }
+    // Set the feature as seen.
     featureProbs[featIdx][1] = 1;
   }
 
+  // p(a=cur_act, phi_i=0) = p(a=cur_act) - p(a=cur_act, phi_i=1)
   for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
+    // Update the probabilities for the inactive features.
     if (it->second[1] == 0) {
-      log_joint += log(1 - it->second[0]);
+      log_joint += log(actionProbs[action] - it->second[0]) +
+                   log(it->second[action + ACTION_OFFSET]);
     } else {
+      // Reset the seen features to unseen as its update has already been done.
       it->second[1] = 0;
     }
   }
@@ -77,13 +132,16 @@ double SarsaEBLearner::feature_log_joint_prob(vector<long long>& features,
   return log_joint;
 }
 
-double SarsaEBLearner::exploration_bonus(vector<long long>& features,
-                                         long time_step) {
-  double sum_log_rho = feature_log_joint_prob(features, time_step);
-  update_prob_feature(features, time_step);
-  double sum_log_rho_prime = feature_log_joint_prob(features, time_step);
-  double pseudo_count = 1 / (exp(sum_log_rho_prime - sum_log_rho) - 1);
-  return beta / sqrt(pseudo_count + 0.01);
+void SarsaEBLearner::exploration_bonus(vector<long long>& features,
+                                       long time_step,
+                                       vector<double>& act_exp) {
+  for (int action = 0; action < numActions; action++) {
+    double sum_log_rho = feature_log_joint_prob(features, action, time_step);
+    update_prob_feature(features, time_step);
+    double sum_log_rho_prime = feature_log_joint_prob(features, time_step);
+    double pseudo_count = 1 / (exp(sum_log_rho_prime - sum_log_rho) - 1);
+    return beta / sqrt(pseudo_count + 0.01);
+  }
 }
 
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
@@ -135,6 +193,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
     gettimeofday(&tvBegin, NULL);
     double cur_exp_bonus = 0;
     vector<float> tmp_Q;
+    vector<double> act_exp;
     int lives = ale.lives();
     // Repeat(for each step of episode) until game is over:
     // This also stops when the maximum number of steps per episode is reached
@@ -154,7 +213,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         Fnext.clear();
         features->getActiveFeaturesIndices(ale.getScreen(), ale.getRAM(),
                                            Fnext);
-        cur_exp_bonus = exploration_bonus(Fnext, time_step);
+        exploration_bonus(Fnext, time_step, act_exp);
         trueFnextSize = Fnext.size();
         groupFeatures(Fnext);
 
