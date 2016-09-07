@@ -21,7 +21,7 @@ class SarsaEBLearner : public SarsaLearner {
  private:
   double beta, sigma;
   unordered_map<long long, vector<double>> featureProbs;
-  unordered_map<long long, double> actionMarginals;
+  unordered_map<int, double> actionMarginals;
 
   const int ACTION_OFFSET = 2;
   int NUM_PHI_OFFSET;
@@ -42,7 +42,7 @@ class SarsaEBLearner : public SarsaLearner {
   *        the centroids may simply be positions of the visited state-action
   *        pairs in feature space.
   */
-  void metric(vector<long long>& sa_cur, vector<long long>& centroid);
+  // void metric(vector<long long>& sa_cur, vector<long long>& centroid);
 
   /**
   * Measure of similarity between state-action pairs and a centroid.
@@ -55,8 +55,8 @@ class SarsaEBLearner : public SarsaLearner {
   *        the centroids may simply be positions of the visited state-action
   *        pairs in feature space.
   */
-  void similarity_measure(vector<long long>& sa_cur,
-                          vector<long long>& centroid);
+  // void similarity_measure(vector<long long>& sa_cur,
+  //                         vector<long long>& centroid);
 
   /**
   * A generalized state-action visit count. Roughly represents the visit
@@ -64,7 +64,7 @@ class SarsaEBLearner : public SarsaLearner {
   * @param vector<long long>& sa_cur A concatenation of the feature vector
   *        and action.
   */
-  double pseudo_count(vector<long long>& sa_cur);
+  // double pseudo_count(vector<long long>& sa_cur);
 
   /**
   * A bonus added to the external reward to incentivise exploration. Roughly
@@ -73,7 +73,7 @@ class SarsaEBLearner : public SarsaLearner {
   * of the Q-function.
   * @param long int: time steps elapsed
   */
-  double exploration_bonus(vector<long long>& features, long time_step);
+  // double exploration_bonus(vector<long long>& features, long time_step);
 
   /**
   * Update the running probablity measure for occurance for each feature.
@@ -82,14 +82,8 @@ class SarsaEBLearner : public SarsaLearner {
   * of the Q-function.
   * @param int no of time steps elapsed.
   */
-  void update_prob_feature(vector<long long>& features, long time_step);
+  // void update_prob_feature(vector<long long>& features, long time_step);
 
-  /**
-  * Calculate: log(p(phi, a)) = \sum_{i=1}^{len(phi)} log(p(phi_i)p(a/phi_i))
-  */
-  double feature_log_joint_prob(vector<long long>& features,
-                                long time_step,
-                                bool isFirst);
   /**
   * If the feature has not been seen before we create a new map entry of the
   *   form [feature index] : vector {
@@ -99,7 +93,27 @@ class SarsaEBLearner : public SarsaLearner {
   *              n_phi # No of time phi has been active
   *   }
   */
-  bool SarsaEBLearner::add_new_feature_to_map(long long featIdx, int time_step);
+  void add_new_feature_to_map(long long featIdx, int time_step);
+
+  void update_action_marginals(int cur_action, int time_step);
+
+  void update_phi(vector<long long>& features, long time_step);
+
+  void update_action_given_phi(
+      unordered_map<long long, vector<double>>& tmp_featureProbs,
+      vector<long long>& features,
+      int action,
+      long time_step);
+
+  double get_sum_log_phi(vector<long long>& features, long time_step);
+
+  double get_sum_log_action_given_phi(vector<long long>& features,
+                                      int action,
+                                      long time_step);
+
+  void exploration_bonus(vector<long long>& features,
+                         long time_step,
+                         vector<double>& act_exp);
 
  public:
   /**

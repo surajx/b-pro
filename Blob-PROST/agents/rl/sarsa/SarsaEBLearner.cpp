@@ -32,18 +32,23 @@ SarsaEBLearner::SarsaEBLearner(ALEInterface& ale,
   beta = param->getBeta();
   sigma = param->getSigma();
 
-  actionProbs.clear();
+  actionMarginals.clear();
   featureProbs.clear();
   featureProbs.reserve(60000);
 
   NUM_PHI_OFFSET = ACTION_OFFSET + numActions;
 }
 
-void SarsaEBLearner::update_action_marginals() {}
+void SarsaEBLearner::update_action_marginals(int cur_action, int time_step) {
+  for (int action = 0; action < numActions; action++) {
+    actionMarginals[action] *= (time_step + 1) / (time_step + 1);
+    if (action == cur_action) {
+      actionMarginals[action] += 1.0 / (time_step + 2);
+    }
+  }
+}
 
-void SarsaEBLearner::update_phi(vector<long long & features>,
-                                int action,
-                                long time_step) {
+void SarsaEBLearner::update_phi(vector<long long>& features, long time_step) {
   // Updating the p(phi) and p(a/phi)
   // p(phi)  : rho_{t+1} = ((rho_t * (t + 1)) + phi_{t + 1}) / (t + 2)
 
@@ -80,10 +85,10 @@ void SarsaEBLearner::update_action_given_phi(
   }
 }
 
-bool SarsaEBLearner::add_new_feature_to_map(long long featIdx, int time_step) {
+void SarsaEBLearner::add_new_feature_to_map(long long featIdx, int time_step) {
   // Creating new vector to store needed data for active feature.
   vector<double> v(ACTION_OFFSET + numActions + 1);
-  v.push_back(0.5 / (time_step + 1);
+  v.push_back(1.5 / (time_step + 1));
   v.push_back(0);
 
   // p(a=cur_act/phi_i=1) = \frac{n_{cur_act} + (1/numActions)}{n_phi + 1}
@@ -104,7 +109,7 @@ double SarsaEBLearner::get_sum_log_phi(vector<long long>& features,
   //       calculate it as 1 - \sum_{j=1}^{numActions-1} p(a_j/phi_i)
   for (long long featIdx : features) {
     if (featureProbs.find(featIdx) == featureProbs.end()) {
-      add_new_feature_to_map(featIdx, time_step)
+      add_new_feature_to_map(featIdx, time_step);
     }
 
     // p(phi_i=1)
@@ -187,7 +192,7 @@ void SarsaEBLearner::exploration_bonus(vector<long long>& features,
   double sum_log_rho_phi_prime = get_sum_log_phi(features, time_step);
   unordered_map<long long, vector<double>> tmp_featureProbs;
   double pseudo_count = 0;
-  double sum_log_a_given_phi_prime = 0;
+  double log_joint_phi_action_prime = 0;
   for (int action = 0; action < numActions; action++) {
     // Copy original Map to tmp Map
     tmp_featureProbs = featureProbs;
@@ -225,6 +230,11 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
 
   long long trueFeatureSize = 0;
   long long trueFnextSize = 0;
+
+  // Initialize action Marginals
+  for (int action = 0; action < numActions; action++) {
+    actionMarginals[action] = 1.0 / numActions;
+  }
 
   // Repeat (for each episode):
   // This is going to be interrupted by the ALE code since I set max_num_frames
@@ -290,7 +300,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
           tmp_Q[action] += act_exp[action];
         }
         nextAction = Mathematics::argmax(tmp_Q, agentRand);
-        printf("nextAction: %d\n", nextAction);
+        // printf("nextAction: %d\n", nextAction);
       } else {
         nextAction = 0;
         for (unsigned int i = 0; i < Qnext.size(); i++) {
@@ -317,11 +327,6 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       currentAction = nextAction;
       time_step++;
     }
-
-    // for (auto it = featureProbs.begin(); it != featureProbs.end(); ++it) {
-    //   std::cout << "Prob for feature: " << it->first << ":" << it->second[0]
-    //             << "," << it->second[1] << endl;
-    // }
 
     gettimeofday(&tvEnd, NULL);
     timeval_subtract(&tvDiff, &tvEnd, &tvBegin);
