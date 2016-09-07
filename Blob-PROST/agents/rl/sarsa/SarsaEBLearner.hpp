@@ -21,7 +21,7 @@ class SarsaEBLearner : public SarsaLearner {
  private:
   double beta, sigma;
   unordered_map<long long, vector<double>> featureProbs;
-  unordered_map<long long, double> actionProbs;
+  unordered_map<long long, double> actionMarginals;
 
   const int ACTION_OFFSET = 2;
   int NUM_PHI_OFFSET;
@@ -90,6 +90,16 @@ class SarsaEBLearner : public SarsaLearner {
   double feature_log_joint_prob(vector<long long>& features,
                                 long time_step,
                                 bool isFirst);
+  /**
+  * If the feature has not been seen before we create a new map entry of the
+  *   form [feature index] : vector {
+  *              p(phi_{i}),
+  *              seen_flag, # 1-seen, 0-not
+  *              p(a_1/phi_{i}),...,p(a_n/phi_{i}),
+  *              n_phi # No of time phi has been active
+  *   }
+  */
+  bool SarsaEBLearner::add_new_feature_to_map(long long featIdx, int time_step);
 
  public:
   /**
