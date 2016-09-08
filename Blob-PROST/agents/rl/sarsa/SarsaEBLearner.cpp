@@ -240,11 +240,10 @@ void SarsaEBLearner::exploration_bonus(
         (exp(log_joint_phi_action_prime - log_joint_phi_action[action]) - 1);
 
     // push the exploration bonus to the output vector.
-    printf("log_joint_phi_action_prime: %f\n", log_joint_phi_action_prime);
-    printf("log_joint_phi_action[%d]: %f\n", action,
-           log_joint_phi_action[action]);
-    printf("pseudo_count[%d]: %.99f\n", action, pseudo_count);
-
+    // printf("log_joint_phi_action_prime: %f\n", log_joint_phi_action_prime);
+    // printf("log_joint_phi_action[%d]: %f\n", action,
+    //        log_joint_phi_action[action]);
+    printf("pseudo_count[%d]: %.20f\n", action, pseudo_count);
     act_exp[action] = beta / sqrt(pseudo_count + 0.01);
   }
 }
@@ -337,11 +336,12 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
           printf("Q-value[%d]: %f\n", action, tmp_Q[action]);
         }
         nextAction = Mathematics::argmax(tmp_Q, agentRand);
+        // nextAction = epsilonGreedy(tmp_Q, episode);
         update_action_marginals(nextAction, time_step);
         featureProbs = updated_structure[nextAction];
+        printf("reward: %f\n", reward[0]);
         printf("exp_bonus: %f\n", act_exp[nextAction]);
         printf("action taken: %d\n", nextAction);
-
       } else {
         nextAction = 0;
         for (unsigned int i = 0; i < Qnext.size(); i++) {
