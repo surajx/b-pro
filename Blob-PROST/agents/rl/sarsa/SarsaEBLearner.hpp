@@ -26,6 +26,8 @@ class SarsaEBLearner : public SarsaLearner {
   const int ACTION_OFFSET = 2;
   int NUM_PHI_OFFSET;
 
+  const double MIN_PROB = 1e-9;
+
   /**
    * Constructor declared as private to force the user to instantiate
    * SarsaEBLearner informing the parameters to learning/execution.
@@ -105,15 +107,21 @@ class SarsaEBLearner : public SarsaLearner {
       int action,
       long time_step);
 
-  double get_sum_log_phi(vector<long long>& features, long time_step);
-
-  double get_sum_log_action_given_phi(vector<long long>& features,
-                                      int action,
-                                      long time_step);
-
-  void exploration_bonus(vector<long long>& features,
+  double get_sum_log_phi(vector<long long>& features,
                          long time_step,
-                         vector<double>& act_exp);
+                         bool isFirst);
+
+  double get_sum_log_action_given_phi(
+      unordered_map<long long, vector<double>>& context_featureProbs,
+      vector<long long>& features,
+      int action,
+      long time_step);
+
+  void exploration_bonus(
+      vector<long long>& features,
+      long time_step,
+      vector<double>& act_exp,
+      vector<unordered_map<long long, vector<double>>>& updated_structure);
 
  public:
   /**
