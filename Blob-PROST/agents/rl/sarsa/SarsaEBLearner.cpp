@@ -240,9 +240,9 @@ void SarsaEBLearner::exploration_bonus(
         (exp(log_joint_phi_action_prime - log_joint_phi_action[action]) - 1);
 
     // push the exploration bonus to the output vector.
-    // printf("log_joint_phi_action_prime: %f\n", log_joint_phi_action_prime);
-    // printf("log_joint_phi_action[%d]: %f\n", action,
-    //        log_joint_phi_action[action]);
+    printf("log_joint_phi_action_prime: %f\n", log_joint_phi_action_prime);
+    printf("log_joint_phi_action[%d]: %f\n", action,
+           log_joint_phi_action[action]);
     printf("pseudo_count[%d]: %.99f\n", action, pseudo_count);
 
     act_exp[action] = beta / sqrt(pseudo_count + 0.01);
