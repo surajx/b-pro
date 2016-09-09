@@ -19,7 +19,7 @@ using namespace std;
 
 class SarsaEBLearner : public SarsaLearner {
  private:
-  double beta, sigma;
+  double beta, sigma, kappa, init_w_value;
   unordered_map<long long, vector<double>> featureProbs;
   unordered_map<int, double> actionMarginals;
 
@@ -122,6 +122,8 @@ class SarsaEBLearner : public SarsaLearner {
       long time_step,
       vector<double>& act_exp,
       vector<unordered_map<long long, vector<double>>>& updated_structure);
+
+  void groupFeatures(vector<long long>& activeFeatures);
 
  public:
   /**

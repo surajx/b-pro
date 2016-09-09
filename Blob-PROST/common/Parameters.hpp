@@ -32,7 +32,8 @@ private:
     double gamma;                   //discount factor
     double epsilon;                 //exploration probability
     double lambda;                  //trace
-    double beta;                    //Exploration bonus
+    double beta;                    //Exploration rate
+    double kappa;                   //Numerical Stability in calculation of EB
     double sigma;                   //Generalization Parameter
     double traceThreshold;          //threshold to make the trace zero, to avoid very small values
     int seed;                       //seed to be used by the random number generator
@@ -160,7 +161,11 @@ private:
     /**
      * @param double value that represents SIGMA in the config file
      */
-    void setSigma(double a);    
+    void setSigma(double a);
+    /**
+     * @param double value that represents KAPPA in the config file
+     */
+    void setKappa(double a);    
     /**
      * @param int (representing double) value that represents DISPLAY in the config file.
      * If 1 the game will be shown, otherwise it is just run without graphical output.
@@ -311,7 +316,11 @@ public:
     /**
      * @return double value read for SIGMA parameter
      */
-    double getSigma();    
+    double getSigma();
+    /**
+     * @return double value read for KAPPA parameter
+     */
+    double getKappa();    
     /**
      * @return int (representing bool) value read for DISPLAY parameter
      * If 1 the game will be shown, otherwise it is just run without graphical output.

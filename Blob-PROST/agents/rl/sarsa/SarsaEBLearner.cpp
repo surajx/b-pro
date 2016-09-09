@@ -31,6 +31,9 @@ SarsaEBLearner::SarsaEBLearner(ALEInterface& ale,
   printf("SarsaEBLearner is Running the show!!!\n");
   beta = param->getBeta();
   sigma = param->getSigma();
+  kappa = param->getKappa();
+
+  init_w_value = beta / (sqrt(kappa) * (1 - gamma));
 
   actionMarginals.clear();
   featureProbs.clear();
@@ -336,7 +339,6 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
           printf("Q-value[%d]: %f\n", action, tmp_Q[action]);
         }
         nextAction = Mathematics::argmax(tmp_Q, agentRand);
-        // nextAction = epsilonGreedy(tmp_Q, episode);
         update_action_marginals(nextAction, time_step);
         featureProbs = updated_structure[nextAction];
         printf("reward: %f\n", reward[0]);
@@ -392,6 +394,77 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
                      saveWeightsEveryXFrames, episodeFrames, episodeFps);
       saveThreshold += saveWeightsEveryXFrames;
     }
+  }
+}
+
+void SarsaEBLearner::groupFeatures(vector<long long>& activeFeatures) {
+  vector<long long> activeGroupIndices;
+
+  int newGroup = 0;
+  for (unsigned long long i = 0; i < activeFeatures.size(); ++i) {
+    long long featureIndex = activeFeatures[i];
+    if (featureTranslate[featureIndex] == 0) {
+      if (newGroup) {
+        featureTranslate[featureIndex] = numGroups;
+        groups[numGroups - 1].numFeatures += 1;
+      } else {
+        newGroup = 1;
+        Group agroup;
+        agroup.numFeatures = 1;
+        agroup.features.clear();
+        groups.push_back(agroup);
+        for (unsigned int action = 0; action < w.size(); ++action) {
+          w[action].push_back(init_w_value / activeFeatures.size());
+          e[action].push_back(0.0);
+        }
+        ++numGroups;
+        featureTranslate[featureIndex] = numGroups;
+      }
+    } else {
+      long long groupIndex = featureTranslate[featureIndex] - 1;
+      auto it = &groups[groupIndex].features;
+      if (it->size() == 0) {
+        activeGroupIndices.push_back(groupIndex);
+      }
+      it->push_back(featureIndex);
+    }
+  }
+
+  activeFeatures.clear();
+  if (newGroup) {
+    activeFeatures.push_back(groups.size() - 1);
+  }
+
+  for (unsigned long long index = 0; index < activeGroupIndices.size();
+       ++index) {
+    long long groupIndex = activeGroupIndices[index];
+    if (groups[groupIndex].features.size() != groups[groupIndex].numFeatures &&
+        groups[groupIndex].features.size() != 0) {
+      Group agroup;
+      agroup.numFeatures = groups[groupIndex].features.size();
+      agroup.features.clear();
+      groups.push_back(agroup);
+      ++numGroups;
+      for (unsigned long long i = 0; i < groups[groupIndex].features.size();
+           ++i) {
+        featureTranslate[groups[groupIndex].features[i]] = numGroups;
+      }
+      activeFeatures.push_back(numGroups - 1);
+      for (unsigned a = 0; a < w.size(); ++a) {
+        w[a].push_back(w[a][groupIndex]);
+        e[a].push_back(e[a][groupIndex]);
+        if (e[a].back() >= traceThreshold) {
+          nonZeroElig[a].push_back(numGroups - 1);
+        }
+      }
+      groups[groupIndex].numFeatures =
+          groups[groupIndex].numFeatures - groups[groupIndex].features.size();
+    } else if (groups[groupIndex].features.size() ==
+               groups[groupIndex].numFeatures) {
+      activeFeatures.push_back(groupIndex);
+    }
+    groups[groupIndex].features.clear();
+    groups[groupIndex].features.shrink_to_fit();
   }
 }
 

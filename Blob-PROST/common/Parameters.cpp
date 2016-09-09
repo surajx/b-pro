@@ -175,6 +175,7 @@ void Parameters::parseParametersFromConfigFile(std::string cfgFileName){
     this->setEpsilon(atof(parameters["EPSILON"].c_str()));
     this->setLambda(atof(parameters["LAMBDA"].c_str()));
     this->setBeta(atof(parameters["BETA"].c_str()));
+    this->setKappa(atof(parameters["KAPPA"].c_str()));
     this->setSigma(atof(parameters["SIGMA"].c_str()));
     this->setDisplay(atoi(parameters["DISPLAY"].c_str()));
     this->setEpisodeLength(atoi(parameters["EPISODE_LENGTH"].c_str()));
@@ -335,6 +336,14 @@ void Parameters::setSigma(double a){
 
 double Parameters::getSigma(){
     return this->sigma;
+}
+
+void Parameters::setKappa(double a){
+    this->kappa = a;
+}
+
+double Parameters::getKappa(){
+    return this->kappa;
 }
 
 void Parameters::setDisplay(int a){
