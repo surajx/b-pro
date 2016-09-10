@@ -24,6 +24,12 @@ class SarsaEBLearner : public SarsaLearner {
   unordered_map<long long, vector<double>> featureProbs;
   unordered_map<int, double> actionMarginals;
 
+  const double QI_alpha = 0.25;
+  double QI_delta;
+  vector<float> QI;            // Q(a) entries
+  vector<float> QInext;        // Q(a) entries for next action
+  vector<vector<float>> QI_w;  // Theta, weights vector
+
   bool is_min_prob_activated;
 
   const int ACTION_OFFSET = 2;
@@ -131,6 +137,10 @@ class SarsaEBLearner : public SarsaLearner {
                            int action);
 
   void groupFeatures(vector<long long>& activeFeatures);
+
+  int epsilonQI(vector<float>& QValues, vector<float>& QIValues, int episode);
+
+  void updateQIValues(vector<long long>& Features, vector<float>& QValues);
 
  public:
   /**

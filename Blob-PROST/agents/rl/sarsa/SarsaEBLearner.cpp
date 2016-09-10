@@ -36,11 +36,31 @@ SarsaEBLearner::SarsaEBLearner(ALEInterface& ale,
 
   init_w_value = beta / (sqrt(kappa) * (1 - gamma));
 
+  for (int i = 0; i < numActions; i++) {
+    // Initialize Q;
+    QI.push_back(0);
+    QInext.push_back(0);
+    // Initialize w:
+    QI_w.push_back(vector<float>());
+  }
+
   actionMarginals.clear();
   featureProbs.clear();
   featureProbs.reserve(60000);
 
   NUM_PHI_OFFSET = ACTION_OFFSET + numActions;
+}
+
+void SarsaEBLearner::updateQIValues(vector<long long>& Features,
+                                    vector<float>& QValues) {
+  unsigned long long featureSize = Features.size();
+  for (int a = 0; a < numActions; ++a) {
+    float sumW = 0;
+    for (unsigned long long i = 0; i < featureSize; ++i) {
+      sumW = sumW + QI_w[a][Features[i]] * groups[Features[i]].numFeatures;
+    }
+    QValues[a] = sumW;
+  }
 }
 
 void SarsaEBLearner::update_action_marginals(int cur_action, int time_step) {
@@ -297,6 +317,26 @@ double SarsaEBLearner::exploration_bonus(vector<long long>& features,
   return beta / sqrt(pseudo_count + kappa);
 }
 
+int SarsaEBLearner::epsilonQI(vector<float>& QValues,
+                              vector<float>& QIValues,
+                              int episode) {
+  randomActionTaken = 0;
+
+  int action = Mathematics::argmax(QValues, agentRand);
+  // With probability epsilon: a <- random action in A(s)
+  int random = (*agentRand)();
+  float epsilon = finalEpsilon;
+  if (epsilonDecay && episode <= finalExplorationFrame) {
+    epsilon = 1 - (1 - finalEpsilon) * episode / finalExplorationFrame;
+  }
+  if ((random % int(nearbyint(1.0 / epsilon))) == 0) {
+    // if((rand()%int(1.0/epsilon)) == 0){
+    randomActionTaken = 1;
+    action = Mathematics::argmax(QIValues, agentRand);
+  }
+  return action;
+}
+
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
   struct timeval tvBegin, tvEnd, tvDiff;
   vector<float> reward;
@@ -350,8 +390,10 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
     trueFeatureSize = F.size();
     groupFeatures(F);
     updateQValues(F, Q);
+    updateQIValues(F, QI);
 
-    currentAction = epsilonGreedy(Q, episode);
+    currentAction = epsilonQI(Q, QI, episode);
+    // currentAction = epsilonGreedy(Q, episode);
     // currentAction = Mathematics::argmax(Q, agentRand);
     gettimeofday(&tvBegin, NULL);
     int lives = ale.lives();
@@ -362,6 +404,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       reward.push_back(0.0);
       reward.push_back(0.0);
       updateQValues(F, Q);
+      updateQIValues(F, QI);
       updateReplTrace(currentAction, F);
 
       sanityCheck();
@@ -370,6 +413,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       curExpBonus = exploration_bonus(tmp_F, time_step, currentAction);
       for (int action = 0; action < numActions; action++) {
         printf("Q-value[%d]: %f\n", action, Q[action]);
+        printf("QI-value[%d]: %f\n", action, QI[action]);
       }
       cumReward += reward[1];
       if (!ale.game_over()) {
@@ -386,7 +430,10 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
 
         // Update Q-values for the new active features
         updateQValues(Fnext, Qnext);
-        nextAction = epsilonGreedy(Qnext, episode);
+        updateQIValues(Fnext, QInext);
+
+        nextAction = epsilonQI(Qnext, QInext, episode);
+        // nextAction = epsilonGreedy(Qnext, episode);
         // nextAction = Mathematics::argmax(Qnext, agentRand);
         update_action_marginals(nextAction, time_step);
         printf("reward: %f\n", reward[0]);
@@ -396,6 +443,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         nextAction = 0;
         for (unsigned int i = 0; i < Qnext.size(); i++) {
           Qnext[i] = 0;
+          QInext[i] = 0;
         }
       }
       // To ensure the learning rate will never increase along
@@ -405,10 +453,11 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         learningRate = alpha / maxFeatVectorNorm;
       }
       if (!is_min_prob_activated) {
-        delta = reward[0] + curExpBonus + gamma * Qnext[nextAction] -
-                Q[currentAction];
+        delta = reward[0] + gamma * Qnext[nextAction] - Q[currentAction];
+        QI_delta = curExpBonus + gamma * QInext[nextAction] - QI[currentAction];
       } else {
         delta = 0;
+        QI_delta = 0;
         is_min_prob_activated = false;
       }
       // Update weights vector:
@@ -416,6 +465,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         for (unsigned int i = 0; i < nonZeroElig[a].size(); i++) {
           long long idx = nonZeroElig[a][i];
           w[a][idx] = w[a][idx] + learningRate * delta * e[a][idx];
+          QI_w[a][idx] = QI_w[a][idx] + QI_alpha * QI_delta * e[a][idx];
         }
       }
       F = Fnext;
@@ -467,8 +517,9 @@ void SarsaEBLearner::groupFeatures(vector<long long>& activeFeatures) {
         agroup.features.clear();
         groups.push_back(agroup);
         for (unsigned int action = 0; action < w.size(); ++action) {
-          w[action].push_back(init_w_value / activeFeatures.size());
+          w[action].push_back(0.0);
           e[action].push_back(0.0);
+          QI_w[action].push_back(init_w_value / activeFeatures.size());
         }
         ++numGroups;
         featureTranslate[featureIndex] = numGroups;
@@ -506,6 +557,7 @@ void SarsaEBLearner::groupFeatures(vector<long long>& activeFeatures) {
       for (unsigned a = 0; a < w.size(); ++a) {
         w[a].push_back(w[a][groupIndex]);
         e[a].push_back(e[a][groupIndex]);
+        QI_w[a].push_back(QI_w[a][groupIndex]);
         if (e[a].back() >= traceThreshold) {
           nonZeroElig[a].push_back(numGroups - 1);
         }
