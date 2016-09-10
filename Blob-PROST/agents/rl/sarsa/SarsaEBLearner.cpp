@@ -32,6 +32,7 @@ SarsaEBLearner::SarsaEBLearner(ALEInterface& ale,
   beta = param->getBeta();
   sigma = param->getSigma();
   kappa = param->getKappa();
+  is_min_prob_activated = false;
 
   init_w_value = beta / (sqrt(kappa) * (1 - gamma));
 
@@ -171,7 +172,6 @@ double SarsaEBLearner::get_sum_log_action_given_phi(
                 (it->second[0] * it->second[action + ACTION_OFFSET])) -
             log(1 - it->second[0]);
       if (tmp != tmp) {
-        // printf("(1.1) sum_log_action_given_phi: %f\n", fuck);
         // printf("(1.2) Crazy difference: %.10f\n",
         //        actionMarginals[action] -
         //            (it->second[0] * it->second[action + ACTION_OFFSET]));
@@ -182,11 +182,20 @@ double SarsaEBLearner::get_sum_log_action_given_phi(
         // printf("(1.6) p(phi=1)[%d]: %f\n", action, it->second[0]);
         // printf("(1.7) p(a/phi=1)[%d]: %f\n", action,
         //        it->second[action + ACTION_OFFSET]);
+        for (int i = 0; i < 5; i++) {
+          printf("#################MIN PROB HACK ACTIVATED#################\n");
+        }
+        printf("[BEFORE] p(phi): %.10f\n", it->second[0]);
         it->second[0] = (actionMarginals[action] - MIN_PROB) /
                         (it->second[action + ACTION_OFFSET]);
+        printf("[AFTER] p(phi): %.10f\n", it->second[0]);
+        for (int i = 0; i < 5; i++) {
+          printf("####################MIN PROB HACK END####################\n");
+        }
         // printf("(1.8) p(phi=1)[%d]: %f\n", action,
         //        it->second[action + ACTION_OFFSET]);
         tmp = log(MIN_PROB) - log(1 - it->second[0]);
+        is_min_prob_activated = true;
       }
       sum_log_action_given_phi += tmp;
 
@@ -251,6 +260,43 @@ void SarsaEBLearner::exploration_bonus(
   }
 }
 
+double SarsaEBLearner::exploration_bonus(vector<long long>& features,
+                                         long time_step,
+                                         int action) {
+  // Calculate p(phi)
+  double sum_log_rho_phi = get_sum_log_phi(features, time_step, true);
+
+  // Calculate p(action/phi) for max action
+  double sum_log_action_given_phi =
+      get_sum_log_action_given_phi(featureProbs, features, action, time_step);
+  double log_joint_phi_action = sum_log_rho_phi + sum_log_action_given_phi;
+
+  // Update the phi values with the currently seen features.
+  update_phi(features, time_step);
+
+  // Calculate p'(phi)
+  double sum_log_rho_phi_prime = get_sum_log_phi(features, time_step, false);
+
+  // Update the action given phi values for the current action and features.
+  update_action_given_phi(featureProbs, features, action, time_step);
+
+  // Calculate p'(a,phi)
+  sum_log_action_given_phi =
+      get_sum_log_action_given_phi(featureProbs, features, action, time_step);
+  double log_joint_phi_action_prime =
+      sum_log_rho_phi_prime + sum_log_action_given_phi;
+
+  // calculate pseudo count as (1/(exp(p(phi' - p()))-1))
+  double pseudo_count =
+      1.0 / (exp(log_joint_phi_action_prime - log_joint_phi_action) - 1);
+
+  // push the exploration bonus to the output vector.
+  printf("log_joint_phi_action_prime: %f\n", log_joint_phi_action_prime);
+  printf("log_joint_phi_action[%d]: %f\n", action, log_joint_phi_action);
+  printf("pseudo_count[%d]: %.20f\n", action, pseudo_count);
+  return beta / sqrt(pseudo_count + kappa);
+}
+
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
   struct timeval tvBegin, tvEnd, tvDiff;
   vector<float> reward;
@@ -266,10 +312,9 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
 
   long long trueFeatureSize = 0;
   long long trueFnextSize = 0;
-  vector<double> act_exp(numActions);
-  vector<float> tmp_Q;
-  vector<unordered_map<long long, vector<double>>> updated_structure(
-      numActions);
+
+  vector<long long> tmp_F;
+  double curExpBonus = 0;
 
   // Initialize action Marginals
   for (int action = 0; action < numActions; action++) {
@@ -301,11 +346,13 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
 
     F.clear();
     features->getActiveFeaturesIndices(ale.getScreen(), ale.getRAM(), F);
+    tmp_F = F;
     trueFeatureSize = F.size();
     groupFeatures(F);
     updateQValues(F, Q);
 
     currentAction = epsilonGreedy(Q, episode);
+    // currentAction = Mathematics::argmax(Q, agentRand);
     gettimeofday(&tvBegin, NULL);
     int lives = ale.lives();
     // Repeat(for each step of episode) until game is over:
@@ -320,30 +367,31 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       sanityCheck();
       // Take action, observe reward and next state:
       act(ale, currentAction, reward);
+      curExpBonus = exploration_bonus(tmp_F, time_step, currentAction);
+      for (int action = 0; action < numActions; action++) {
+        printf("Q-value[%d]: %f\n", action, Q[action]);
+      }
       cumReward += reward[1];
       if (!ale.game_over()) {
         // Obtain active features in the new state:
         Fnext.clear();
         features->getActiveFeaturesIndices(ale.getScreen(), ale.getRAM(),
                                            Fnext);
-        exploration_bonus(Fnext, time_step, act_exp, updated_structure);
+        if (Fnext == tmp_F) {
+          printf("Both sates are same\n");
+        }
+        tmp_F = Fnext;
         trueFnextSize = Fnext.size();
         groupFeatures(Fnext);
 
         // Update Q-values for the new active features
         updateQValues(Fnext, Qnext);
-        // nextAction = epsilonGreedy(Qnext, episode);
-        tmp_Q = Qnext;
-        for (int action = 0; action < numActions; action++) {
-          tmp_Q[action] += act_exp[action];
-          printf("Q-value[%d]: %f\n", action, tmp_Q[action]);
-        }
-        nextAction = Mathematics::argmax(tmp_Q, agentRand);
+        nextAction = epsilonGreedy(Qnext, episode);
+        // nextAction = Mathematics::argmax(Qnext, agentRand);
         update_action_marginals(nextAction, time_step);
-        featureProbs = updated_structure[nextAction];
         printf("reward: %f\n", reward[0]);
-        printf("exp_bonus: %f\n", act_exp[nextAction]);
-        printf("action taken: %d\n", nextAction);
+        printf("exp_bonus: %.10f\n", curExpBonus);
+        printf("action taken: %d\n", currentAction);
       } else {
         nextAction = 0;
         for (unsigned int i = 0; i < Qnext.size(); i++) {
@@ -356,8 +404,13 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         maxFeatVectorNorm = trueFeatureSize;
         learningRate = alpha / maxFeatVectorNorm;
       }
-      delta = reward[0] + act_exp[nextAction] + gamma * Qnext[nextAction] -
-              Q[currentAction];
+      if (!is_min_prob_activated) {
+        delta = reward[0] + curExpBonus + gamma * Qnext[nextAction] -
+                Q[currentAction];
+      } else {
+        delta = 0;
+        is_min_prob_activated = false;
+      }
       // Update weights vector:
       for (unsigned int a = 0; a < nonZeroElig.size(); a++) {
         for (unsigned int i = 0; i < nonZeroElig[a].size(); i++) {

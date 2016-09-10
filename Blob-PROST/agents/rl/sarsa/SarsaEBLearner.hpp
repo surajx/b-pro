@@ -14,6 +14,7 @@
 #endif
 #include <vector>
 #include <unordered_map>
+#include <limits>
 
 using namespace std;
 
@@ -23,10 +24,12 @@ class SarsaEBLearner : public SarsaLearner {
   unordered_map<long long, vector<double>> featureProbs;
   unordered_map<int, double> actionMarginals;
 
+  bool is_min_prob_activated;
+
   const int ACTION_OFFSET = 2;
   int NUM_PHI_OFFSET;
 
-  const double MIN_PROB = 1e-9;
+  const double MIN_PROB = std::numeric_limits<double>::min();  // 1e-9;
 
   /**
    * Constructor declared as private to force the user to instantiate
@@ -122,6 +125,10 @@ class SarsaEBLearner : public SarsaLearner {
       long time_step,
       vector<double>& act_exp,
       vector<unordered_map<long long, vector<double>>>& updated_structure);
+
+  double exploration_bonus(vector<long long>& features,
+                           long time_step,
+                           int action);
 
   void groupFeatures(vector<long long>& activeFeatures);
 
