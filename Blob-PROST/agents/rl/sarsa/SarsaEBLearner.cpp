@@ -451,6 +451,7 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
       if (trueFeatureSize > maxFeatVectorNorm) {
         maxFeatVectorNorm = trueFeatureSize;
         learningRate = alpha / maxFeatVectorNorm;
+        QI_learningRate = QI_alpha / maxFeatVectorNorm;
       }
       if (!is_min_prob_activated) {
         delta = reward[0] + gamma * Qnext[nextAction] - Q[currentAction];
@@ -460,12 +461,14 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         QI_delta = 0;
         is_min_prob_activated = false;
       }
+      printf("delta: %f\n", delta);
+      printf("QI_delta: %f\n", QI_delta);
       // Update weights vector:
       for (unsigned int a = 0; a < nonZeroElig.size(); a++) {
         for (unsigned int i = 0; i < nonZeroElig[a].size(); i++) {
           long long idx = nonZeroElig[a][i];
           w[a][idx] = w[a][idx] + learningRate * delta * e[a][idx];
-          QI_w[a][idx] = QI_w[a][idx] + QI_alpha * QI_delta * e[a][idx];
+          QI_w[a][idx] = QI_w[a][idx] + QI_learningRate * QI_delta * e[a][idx];
         }
       }
       F = Fnext;

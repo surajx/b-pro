@@ -26,6 +26,7 @@ class SarsaEBLearner : public SarsaLearner {
 
   const double QI_alpha = 0.25;
   double QI_delta;
+  float QI_learningRate;
   vector<float> QI;            // Q(a) entries
   vector<float> QInext;        // Q(a) entries for next action
   vector<vector<float>> QI_w;  // Theta, weights vector
