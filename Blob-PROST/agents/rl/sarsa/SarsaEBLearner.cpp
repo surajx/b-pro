@@ -337,6 +337,44 @@ int SarsaEBLearner::epsilonQI(vector<float>& QValues,
   return action;
 }
 
+int SarsaEBLearner::optimisticEpsilonQI(vector<float>& QValues,
+                                        vector<float>& QIValues,
+                                        int episode) {
+  randomActionTaken = 0;
+
+  vector<float> mixedQIQValues(QValues.size());
+
+  std::transform(QValues.begin(), QValues.end(), QIValues.begin(),
+                 mixedQIQValues.begin(),
+                 [&](double q, double qi) { return q + nu * qi; });
+
+  int action = Mathematics::argmax(mixedQIQValues, agentRand);
+  // With probability epsilon: a <- random action in A(s)
+  int random = (*agentRand)();
+  float epsilon = finalEpsilon;
+  if (epsilonDecay && episode <= finalExplorationFrame) {
+    epsilon = 1 - (1 - finalEpsilon) * episode / finalExplorationFrame;
+  }
+
+  if ((random % int(nearbyint(1.0 / epsilon))) == 0) {
+    // if((rand()%int(1.0/epsilon)) == 0){
+    randomActionTaken = 1;
+    vector<float> neqQIValues;
+    for (int i = 0; i < QIValues.size(); i++) {
+      if (QIValues[i] < 0) {
+        neqQIValues.push_back(QIValues[i]);
+      }
+    }
+    if (neqQIValues.size() > 0) {
+      printf("Using negative values to take epsilon action\n");
+      action = Mathematics::argmax(neqQIValues, agentRand);
+    } else {
+      action = Mathematics::argmax(QIValues, agentRand);
+    }
+  }
+  return action;
+}
+
 void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
   struct timeval tvBegin, tvEnd, tvDiff;
   vector<float> reward;
@@ -392,7 +430,8 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
     updateQValues(F, Q);
     updateQIValues(F, QI);
 
-    currentAction = epsilonQI(Q, QI, episode);
+    currentAction = optimisticEpsilonQI(Q, QI, episode);
+    // currentAction = epsilonQI(Q, QI, episode);
     // currentAction = epsilonGreedy(Q, episode);
     // currentAction = Mathematics::argmax(Q, agentRand);
     gettimeofday(&tvBegin, NULL);
@@ -432,7 +471,8 @@ void SarsaEBLearner::learnPolicy(ALEInterface& ale, Features* features) {
         updateQValues(Fnext, Qnext);
         updateQIValues(Fnext, QInext);
 
-        nextAction = epsilonQI(Qnext, QInext, episode);
+        nextAction = optimisticEpsilonQI(Qnext, QInext, episode);
+        // nextAction = epsilonQI(Qnext, QInext, episode);
         // nextAction = epsilonGreedy(Qnext, episode);
         // nextAction = Mathematics::argmax(Qnext, agentRand);
         update_action_marginals(nextAction, time_step);

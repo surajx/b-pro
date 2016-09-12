@@ -24,6 +24,7 @@ class SarsaEBLearner : public SarsaLearner {
   unordered_map<long long, vector<double>> featureProbs;
   unordered_map<int, double> actionMarginals;
 
+  const double nu = 1;
   const double QI_alpha = 0.25;
   double QI_delta;
   float QI_learningRate;
@@ -142,6 +143,10 @@ class SarsaEBLearner : public SarsaLearner {
   int epsilonQI(vector<float>& QValues, vector<float>& QIValues, int episode);
 
   void updateQIValues(vector<long long>& Features, vector<float>& QValues);
+
+  int optimisticEpsilonQI(vector<float>& QValues,
+                          vector<float>& QIValues,
+                          int episode);
 
  public:
   /**
